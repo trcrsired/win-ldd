@@ -1,17 +1,18 @@
 #include <stdio.h>
-#include <iostream>
+#include <sstream>
 #include <vector>
 #include <map>
+#include <memory>
 #include <string>
 
 #include <windows.h>
-#include <Dbghelp.h>
+#include <dbghelp.h>
 
 typedef std::map<std::string, std::string> DepMapType;
 
 //------------------------------------------------------------------------------
 
-const DepMapType getDependencies(const HMODULE hMod)
+inline const DepMapType getDependencies(const HMODULE hMod)
 {
     DepMapType depsMap;
 
@@ -24,15 +25,13 @@ const DepMapType getDependencies(const HMODULE hMod)
         char* dllName = (char*) ((BYTE*)hMod + pImportDesc->Name);
 
         std::string dllPath = "";
-        HMODULE hModDep = ::LoadLibraryEx(dllName, NULL, DONT_RESOLVE_DLL_REFERENCES);
-        if(hModDep != 0)
+        std::unique_ptr<typename std::remove_pointer<HMODULE>::type,decltype(FreeLibrary)*> hModDep(::LoadLibraryEx(dllName, NULL, DONT_RESOLVE_DLL_REFERENCES),FreeLibrary);
+        if(hModDep)
         {
-            LPTSTR  strDLLPath = new TCHAR[_MAX_PATH];
-            ::GetModuleFileName(hModDep, strDLLPath, _MAX_PATH);
-            dllPath = std::string(strDLLPath);
-            delete strDLLPath;
+            std::unique_ptr<typename std::remove_pointer<LPTSTR>::type[]>  strDLLPath(new TCHAR[_MAX_PATH]);
+            ::GetModuleFileName(hModDep.get(), strDLLPath.get(), _MAX_PATH);
+            dllPath = std::string(strDLLPath.get());
         }
-        FreeLibrary(hModDep);
         depsMap[std::string(dllName)] = dllPath;
 
         pImportDesc++;
@@ -43,24 +42,23 @@ const DepMapType getDependencies(const HMODULE hMod)
 
 //------------------------------------------------------------------------------
 
-int printDependencies(const std::string libPath)
+inline int printDependencies(::std::ostream& os,char const* libPath)
 {
-    HMODULE hMod = ::LoadLibraryEx(libPath.c_str(), NULL, DONT_RESOLVE_DLL_REFERENCES);
-    if(hMod == 0)
+    std::unique_ptr<typename std::remove_pointer<HMODULE>::type,decltype(FreeLibrary)*> hMod(::LoadLibraryEx(libPath, NULL, DONT_RESOLVE_DLL_REFERENCES),FreeLibrary);
+    if(!hMod)
     {
         // Retrieves the last error message.
         DWORD   lastError = GetLastError();
         char    buffer[1024];
         FormatMessage( FORMAT_MESSAGE_FROM_SYSTEM, 0, lastError, 0, buffer, 1024, 0 );
-        std::cerr << "\t" << buffer << std::endl;
+        fprintf(stderr,"\t%s\n",buffer);
         return -1;
     }
-    const DepMapType& depMap = getDependencies(hMod);
-    FreeLibrary(hMod);
+    const DepMapType& depMap = getDependencies(hMod.get());
     DepMapType::const_iterator iter;
     for(iter = depMap.begin(); iter != depMap.end(); ++iter)
     {
-        std::cout << "\t" << iter->first << " => " << iter->second << std::endl;
+        os << "\t" << iter->first << " => " << iter->second << '\n';
     }
 
     return 0;
@@ -68,10 +66,10 @@ int printDependencies(const std::string libPath)
 
 //------------------------------------------------------------------------------
 
-int printUsage()
+inline int printUsage()
 {
-    std::cout << "ldd for Windows, Version 1.0" << std::endl;
-    std::cout << "usage:\n ldd FILE..." << std::endl;
+    puts("ldd for Windows, Version 1.0\n"
+        "usage:\n ldd FILE...\n");
     return -1;
 }
 
@@ -84,11 +82,14 @@ int main(int argc, char* argv[])
         return printUsage();
     }
     int res = 0;
+    ::std::ostringstream oss;
     for(int i = 1; i < argc; ++i)
     {
-        std::cout << argv[i] << std::endl;
-        res = printDependencies(argv[i]);
+        oss<<argv[i]<<'\n';
+        res = printDependencies(oss, argv[i]);
     }
+    ::std::string ossstr = oss.str();
+    fwrite(ossstr.data(),1,ossstr.size(),stdout);
     return res;
 }
 
