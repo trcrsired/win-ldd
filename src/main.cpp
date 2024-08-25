@@ -7,6 +7,8 @@
 
 #include <windows.h>
 #include <dbghelp.h>
+#undef min
+#undef max
 
 typedef std::map<std::string, std::string> DepMapType;
 
@@ -88,7 +90,9 @@ int main(int argc, char* argv[])
         res = printDependencies(oss, argv[i]);
     }
     ::std::string ossstr = oss.str();
-    fwrite(ossstr.data(),1,ossstr.size(),stdout);
+
+    DWORD bytesWritten;
+    WriteFile(GetStdHandle(STD_OUTPUT_HANDLE), ossstr.data(), ossstr.size(), ::std::addressof(bytesWritten), nullptr);
     return res;
 }
 
