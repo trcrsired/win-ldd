@@ -34,7 +34,7 @@ inline const DepMapType getDependencies(const HMODULE hMod)
         }
         depsMap[std::string(dllName)] = dllPath;
 
-        pImportDesc++;
+        ++pImportDesc;
     }
 
     return depsMap;
@@ -55,10 +55,9 @@ inline int printDependencies(::std::ostream& os,char const* libPath)
         return -1;
     }
     const DepMapType& depMap = getDependencies(hMod.get());
-    DepMapType::const_iterator iter;
-    for(iter = depMap.begin(); iter != depMap.end(); ++iter)
+    for(auto &ele : depMap)
     {
-        os << "\t" << iter->first << " => " << iter->second << '\n';
+        os << "\t" << ele.first << " => " << ele.second << '\n';
     }
 
     return 0;
