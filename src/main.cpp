@@ -67,10 +67,14 @@ inline int printDependencies(::std::ostream& os,char const* libPath)
 
 //------------------------------------------------------------------------------
 
-inline int printUsage()
+inline int printUsage(int argc, char* argv[])
 {
-    puts("ldd for Windows, Version 1.0\n"
-        "usage:\n ldd FILE...\n");
+    if (argc == 0)
+    {
+        return -1;
+    }
+    fprintf(stderr, "ldd for Windows, Version 1.0\n"
+        "usage:\n %s FILE...\n", *argv);
     return -1;
 }
 
@@ -80,7 +84,7 @@ int main(int argc, char* argv[])
 {
     if(argc <= 1)
     {
-        return printUsage();
+        return printUsage(argc, argv);
     }
     int res = 0;
     ::std::ostringstream oss;
